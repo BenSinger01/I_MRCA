@@ -33,8 +33,8 @@ I_MRCA <- function(v1,v2,N) {
       #sum over pairs of different vertices (don't need to sum over identical
       #vertices since each vertex as a distance of zero from itself)
       for (j in 1:(length(locPairs)/2)){
-        print(locPairs[2,j])
         I <- I + v1@NodeLocationProbabilities[v1@MRCANodes[i],locPairs[1,j]]*v2@NodeLocationProbabilities[v2@MRCANodes[i],locPairs[2,j]]*N@Distances[locPairs[1,j],locPairs[2,j]]
+        I <- I + v1@NodeLocationProbabilities[v1@MRCANodes[i],locPairs[2,j]]*v2@NodeLocationProbabilities[v2@MRCANodes[i],locPairs[1,j]]*N@Distances[locPairs[1,j],locPairs[2,j]]
       }
     }
     return(I)
@@ -45,14 +45,25 @@ I_MRCA <- function(v1,v2,N) {
   }
 }
 
-#GetMRCAVecotor: function to extract a deterministic MRCA location vector from
-#a data frame generated using the read.beast function
-GetMRCAVector <- function(beast){
-  #assign useful quantities
-  n_nodes <- dim(beast@data)[1]
-  n_leaves <- (n_nodes+1)/2
-  #create a vector of all possible pairs of leaf indices
-  pairs <- combn(1:n_leaves,2)
+#Tips is here to make the Get*Vector functions a bit prettier
+Tips <- function(beast){
+  return(unlist(beast@phylo["tip.label"]))
+}
+
+#GetMRCAVector: function to extract a deterministic MRCA location vector from
+#a data frame generated using the read.beast function. The comparison argument
+#can be assigned to another treedata object in order to make sure that only
+#shared leaves are used in creating the vector
+GetMRCAVector <- function(beast, comparison = 0){
+  #if there's a comparison, get rid of the tips not shared between the trees
+  if (class(comparison) == "treedata"){
+    leaves <- Tips(beast)[Tips(beast) %in% Tips(comparison)]
+  }
+  else{
+    leaves <- Tips(beast)
+  }
+  #create a vector of all possible pairs of leaf names
+  pairs <- combn(leaves,2)
   n_choose <- length(pairs)/2
   #initialise the location vector
   V <- character(n_choose)
@@ -67,28 +78,37 @@ GetMRCAVector <- function(beast){
 
 #GetProbabilisticMRCAVecotor: function to extract a probabilistic MRCA location
 #vector from a data frame generated using the read.beast function
-GetProbabilisticMRCAVector <- function(beast){
-  #assign useful quantities
-  n_nodes <- dim(beast@data)[1]
-  n_leaves <- (n_nodes+1)/2
-  locations <- unique(unlist(beast@data["Location.set"]))
-  #create a vector of all possible pairs of leaf indices
-  pairs <- combn(1:n_leaves,2)
+GetProbabilisticMRCAVector <- function(beast, comparison = 0){
+  #if there's a comparison, get rid of the tips not shared between the trees
+  if (class(comparison) == "treedata"){
+    leaves <- Tips(beast)[Tips(beast) %in% Tips(comparison)]
+    locations <- unique(c(unlist(beast@data["Location.set"]),unlist(comparison@data["Location.set"])))
+  }
+  else{
+    leaves <- Tips(beast)
+    locations <- unique(unlist(beast@data["Location.set"]))
+  }
+  #find some useful quantities
+  n_leaves <- length(leaves)
+  n_nodes <- n_leaves-1
+  #create a vector of all possible pairs of leaf names
+  pairs <- combn(leaves,2)
   n_choose <- length(pairs)/2
   #initialise the node vector
-  V <- character(n_choose)
-  #initialise the location probability array
-  X <- array(0,dim = c(n_nodes,length(locations)), dimnames = list(1:n_nodes,locations))
-  #for each pair of leaves, assign the corresponding entry in V to the index
+  V <- character(n_choose)  #for each pair of leaves, assign the corresponding entry in V to the index
   #of the MRCA node
   for (i in 1:n_choose){
     V[i] <- MRCA(beast,pairs[,i])
   }
+  #find the set of nodes
+  nodes = unlist(beast@data["node"])[unlist(beast@data["node"]) %in% V]
+  #initialise the location probability array
+  X <- array(0,dim = c(n_nodes,length(locations)), dimnames = list(nodes,locations))
   #for each node, enter the corresponding location entries into X
-  for (i in 1:n_nodes){
-    locs <- unlist(beast@data[i,"Location.set"])
+  for (n in nodes){
+    locs <- unlist(beast@data[n,"Location.set"])
     for (j in 1:length(locs)){
-      X[i,locs[j]] <- unlist(beast@data[i,"Location.set.prob"])[j]
+      X[n,locs[j]] <- unlist(beast@data[n,"Location.set.prob"])[j]
     }
   }
   return(new("ProbabilisticMRCAVector", NodeLocationProbabilities = X, MRCANodes = V))
@@ -96,8 +116,13 @@ GetProbabilisticMRCAVector <- function(beast){
 
 #GetNetwork: returns a Network object from a data frame made with read.beast,
 #with all locations distance 1 away from each other
-GetNework <- function(beast){
-  locations <- unique(unlist(beast@data["Location.set"]))
+GetNework <- function(beast, comparison = 0){
+  if (class(comparison) == "treedata"){
+    locations <- unique(c(unlist(beast@data["Location.set"]),unlist(comparison@data["Location.set"])))
+  }
+  else{
+    ocations <- unique(unlist(beast@data["Location.set"]))
+  }
   distances <- 1-diag(length(locations))
   rownames(distances) <- locations
   colnames(distances) <- locations
