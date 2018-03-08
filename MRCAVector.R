@@ -9,7 +9,8 @@ setMethod("initialize", "MRCA.vector", function(.Object, ..., MRCA.location)
   {callNextMethod(.Object, ..., MRCA.location = MRCA.location, 
                   leaf.no =  ((1+sqrt(1+8*length(MRCA.location)))/2))})
 
-# class of vectors storing nodes of MRCAs of pairs of leaves, and probabilities over possible locations of the nodes
+# class of vectors storing nodes of MRCAs of pairs of leaves, and probabilities
+# over possible locations of the nodes
 setClass("prob.MRCA.vector", 
          representation(leaf.no = "numeric", node.location.prob = "matrix", 
                         MRCA.node = "character"))
@@ -33,7 +34,7 @@ Tips <- function(beast){
 # a data frame generated using the read.beast function. The comparison argument
 # can be assigned to another treedata object in order to make sure that only
 # shared leaves are used in creating the vector
-MRCAVector <- function(beast, comparison = 0){
+GetMRCAVector <- function(beast, comparison = 0){
   #i f there's a comparison, get rid of the tips not shared between the trees
   if (class(comparison) == "treedata"){
     leaves <- Tips(beast)[Tips(beast) %in% Tips(comparison)]
@@ -57,7 +58,7 @@ MRCAVector <- function(beast, comparison = 0){
 
 # ProbMRCAVector: function to extract a probabilistic MRCA location
 # vector from a data frame generated using the read.beast function
-ProbMRCAVector <- function(beast, comparison = 0){
+GetProbMRCAVector <- function(beast, comparison = 0){
   # if there's a comparison, get rid of the tips not shared between the trees
   if (class(comparison) == "treedata"){
     leaves <- Tips(beast)[Tips(beast) %in% Tips(comparison)]
@@ -99,7 +100,7 @@ ProbMRCAVector <- function(beast, comparison = 0){
 
 # Network: returns a network object from a data frame made with read.beast,
 # with all locations distance 1 away from each other
-Network <- function(beast, comparison = 0){
+GetNetwork <- function(beast, comparison = 0){
   if (class(comparison) == "treedata"){
     locs <- unique(c(unlist(beast@data["Location.set"]),
                           unlist(comparison@data["Location.set"])))
@@ -114,7 +115,7 @@ Network <- function(beast, comparison = 0){
 }
 
 # function to calculate incompatibility of two MRCA.vectors
-I_MRCA <- function(v1,v2,N) {
+I_MRCA <- function(v1,v2,N, normalisation = FALSE) {
   # check that the vectors are of the same class
   if(class(v1) != class(v2)){
     stop("Vectors are of different classes - check if one is probabilistic and the other not")
@@ -131,19 +132,31 @@ I_MRCA <- function(v1,v2,N) {
     # as outlined in the notes/paper accompanying this code
     I <- 0
     locPairs = combn(N@locations,2)
+    # assign the weighting function appropriately
+    if (normalisation){
+      w <- function(i) {
+        return(0.5*(1/(sum(v1@MRCA.node==v1@MRCA.node[i]))+
+                      1/(sum(v2@MRCA.node==v2@MRCA.node[i]))))
+      }
+    } else {
+      w <- function(node1,node2){
+        return(1)
+      }
+    }
     for (i in 1:length(v1@MRCA.node)){
       # sum over pairs of different vertices (don't need to sum over identical
       # vertices since each vertex as a distance of zero from itself). Sum
       # performed for each order of each pair.
       for (j in 1:(length(locPairs)/2)){
-        I <- I + v1@node.location.prob[v1@MRCA.node[i],locPairs[1,j]]*
+        I <- I + w(i)*v1@node.location.prob[v1@MRCA.node[i],locPairs[1,j]]*
           v2@node.location.prob[v2@MRCA.node[i],locPairs[2,j]]*
           N@distances[locPairs[1,j],locPairs[2,j]]
-        I <- I + v1@node.location.prob[v1@MRCA.node[i],locPairs[2,j]]*
+        I <- I + w(i)*v1@node.location.prob[v1@MRCA.node[i],locPairs[2,j]]*
           v2@node.location.prob[v2@MRCA.node[i],locPairs[1,j]]*
           N@distances[locPairs[1,j],locPairs[2,j]]
       }
     }
+    if (normalisation) {I = I/(v1@leaf.no-1)}
     return(I)
   } else {
     # return an error message if the inputs are the wrong type
