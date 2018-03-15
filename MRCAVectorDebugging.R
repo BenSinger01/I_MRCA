@@ -6,8 +6,8 @@
 # class of vectors storing locations of MRCAs of pairs of leaves
 setClass("MRCA.vector", representation(leaf.no = "numeric", MRCA.location = "character"))
 setMethod("initialize", "MRCA.vector", function(.Object, ..., MRCA.location)
-  {callNextMethod(.Object, ..., MRCA.location = MRCA.location, 
-                  leaf.no =  ((1+sqrt(1+8*length(MRCA.location)))/2))})
+{callNextMethod(.Object, ..., MRCA.location = MRCA.location, 
+                leaf.no =  ((1+sqrt(1+8*length(MRCA.location)))/2))})
 
 # class of vectors storing nodes of MRCAs of pairs of leaves, and probabilities
 # over possible locations of the nodes
@@ -16,9 +16,9 @@ setClass("prob.MRCA.vector",
                         MRCA.node = "character"))
 setMethod("initialize", "prob.MRCA.vector", 
           function(.Object, ..., MRCA.node, node.location.prob)
-            {callNextMethod(.Object, ..., 
-                            node.location.prob = node.location.prob, MRCA.node = MRCA.node,
-                            leaf.no =  ((1+sqrt(1+8*length(MRCA.node)))/2))})
+          {callNextMethod(.Object, ..., 
+                          node.location.prob = node.location.prob, MRCA.node = MRCA.node,
+                          leaf.no =  ((1+sqrt(1+8*length(MRCA.node)))/2))})
 
 # class of geographic networks, storing vertices and distances
 setClass("network", representation(locations = "character", distances = "matrix"))
@@ -36,12 +36,9 @@ Tips <- function(beast){
 # shared leaves are used in creating the vector
 GetMRCAVector <- function(beast, comparison = 0){
   #i f there's a comparison, get rid of the tips not shared between the trees
-  if (class(comparison) == "treedata"){
-    leaves <- Tips(beast)[Tips(beast) %in% Tips(comparison)]
-  }
-  else{
-    leaves <- Tips(beast)
-  }
+  leaves <- c("O/ALG/1/2014","O/BAN/1/2009","O/BAN/GO/Ka-236(Pig)/2015",
+              "O/BAN/NA/Ha/156/2013","O/BAR/15/2015", "O/BAR/2/2015",
+              "O/BHU/1/2013","O/BHU/12/2012","O/BHU/2/2009","O/BHU/3/2016")
   # create a vector of all possible pairs of leaf names
   pairs <- combn(leaves,2)
   nChoose <- length(pairs)/2
@@ -50,7 +47,7 @@ GetMRCAVector <- function(beast, comparison = 0){
   # for each pair of leaves, assign the corresponding entry in V to the location
   # of those leaves' MRCA in the BEAST-generated tree
   for (i in 1:nChoose){
-    V[i] <- toString(beast@data[beast@data[,"node"]==MRCA(beast,pairs[,i]),"Location"])
+    V[i] <- toString(beast@data[MRCA(beast,pairs[,i]),"Location"])
   }
   # return a deterministic MRCA vector
   return(new("MRCA.vector", MRCA.location=V))
@@ -63,7 +60,7 @@ GetProbMRCAVector <- function(beast, comparison = 0){
   if (class(comparison) == "treedata"){
     leaves <- Tips(beast)[Tips(beast) %in% Tips(comparison)]
     locs <- unique(c(unlist(beast@data["Location.set"]),
-                          unlist(comparison@data["Location.set"])))
+                     unlist(comparison@data["Location.set"])))
   }
   else{
     leaves <- Tips(beast)
@@ -103,7 +100,7 @@ GetProbMRCAVector <- function(beast, comparison = 0){
 GetNetwork <- function(beast, comparison = 0){
   if (class(comparison) == "treedata"){
     locs <- unique(c(unlist(beast@data["Location.set"]),
-                          unlist(comparison@data["Location.set"])))
+                     unlist(comparison@data["Location.set"])))
   }
   else{
     locs <- unique(unlist(beast@data["Location.set"]))
